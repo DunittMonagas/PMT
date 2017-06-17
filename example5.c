@@ -60,22 +60,22 @@ int main(){
 
     // Send the signal to call the function on the new stack
     printf("Creating child fiber\n");
-    raise( SIGUSR1 );
+    raise(SIGUSR1);
 
     // Execute the child context
-    printf( "Switching to child fiber\n" );
-    if ( setjmp( parent ) ){
+    printf("Switching to child fiber\n");
+    if(setjmp(parent)){
 
-        printf( "Switching to child fiber again\n" );
-        if ( setjmp( parent ) == 0 )
-                longjmp( child, 1 );
+        printf("Switching to child fiber again\n");
+        if(setjmp(parent) == 0)
+                longjmp(child, 1);
 
     }else
-        longjmp( child, 1 );
+        longjmp(child, 1);
 
     // Free the stack
-    free( stack.ss_sp );
-    printf( "Child fiber returned and stack freed\n" );
+    free(stack.ss_sp);
+    printf("Child fiber returned and stack freed\n");
 
     return 0;
 
