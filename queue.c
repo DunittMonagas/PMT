@@ -1,10 +1,15 @@
 
-#include "queue.h"
+
+#include <assert.h>
+#include <stdlib.h>
+
+#include <queue.h>
+
 
 typedef struct queueNode{
 
 	void *item;
-	queueNode *next;
+	struct queueNode *next;
 
 }queueNode;
 
@@ -15,6 +20,7 @@ typedef struct queue_t{
 	unsigned int size;
 
 }queue_t;
+
 
 queue_t *queueAlloc(){
 

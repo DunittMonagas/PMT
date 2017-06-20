@@ -2,11 +2,9 @@
 #ifndef __QUEUE_H__
 #define __QUEUE_H__
 
-#include <assert.h>
-#include <stdlib.h>
+#include <stdbool.h>
 
 typedef struct queue_t queue_t;
-typedef struct queueNode queueNode;
 
 queue_t *queueAlloc();
 void queueFree(queue_t *q);
