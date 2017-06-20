@@ -1,6 +1,6 @@
 
 # Objetos
-*.o
+obj/
 
 # Ejecutables
 *.out
