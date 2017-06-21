@@ -1,4 +1,6 @@
 
+#ifndef __PMT_H__
+#define __PMT_H__
 
 #include <signal.h>
 #include <setjmp.h>
@@ -7,6 +9,8 @@
 typedef struct mctx_st{
 	jmp_buf jb;
 }mctx_t;
+
+typedef unsigned int pmtId;
 
 /* save machine context */
 #define mctx_save(mctx) \
@@ -34,8 +38,12 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 void mctx_create_trampoline(int sig);
 void mctx_create_boot();
 
-int pmtInit();
+int pmtInitialize();
+int pmtTerminate();
+int pmtCreateThread(pmtId *id, void (*func)(void*), void* arg);
 int pmtYield();
-int pmtRun();
-int pmtConfigThread();
-int pmtConfigScheduler();
+int pmtRunThread(pmtId id);
+int pmtSetupThread(pmtId id);
+int pmtSetupScheduler(pmtId id);
+
+#endif
