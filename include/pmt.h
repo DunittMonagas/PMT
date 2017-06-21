@@ -12,6 +12,11 @@ typedef struct mctx_st{
 
 typedef unsigned int pmtId;
 
+#define PMT_OK 0
+#define	PMT_MAX_THREAD 1
+
+#define MAX_THREAD 10
+
 /* save machine context */
 #define mctx_save(mctx) \
 	setjmp((mctx)->jb)
@@ -34,9 +39,9 @@ static void *mctx_creat_arg;
 static sigset_t mctx_creat_sigs;
 
 
-void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_addr, size_t sk_size);
-void mctx_create_trampoline(int sig);
-void mctx_create_boot();
+static void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_addr, size_t sk_size);
+static void mctx_create_trampoline(int sig);
+static void mctx_create_boot();
 
 int pmtInitialize();
 int pmtTerminate();
