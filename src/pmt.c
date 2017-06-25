@@ -8,12 +8,12 @@
 #include <stdbool.h>
 
 #include <pmt.h>
-//#include <queue.h>
+#include <queue.h>
 
 typedef struct thread{
 
-   	pmtId id;
-   	int active;
+   	pmtID id;
+   	PMT_STATUS status;
 	mctx_t *ctx;
    	void *mctx_arg;
 	int priority;
@@ -26,24 +26,24 @@ typedef struct thread{
 }thread_t;
 
 
-//static queue_t *threadQueue;
+static queue_t *threadQueue;
 static int numThread= 0;
 static int sigstksz = 16384;
 static int currentThread= -1;
 static bool threadExecution= false;
-static thread_t threadQueue[MAX_THREAD];
+//static thread_t threadQueue[MAX_THREAD];
 
-
+/*
 static thread_t* getThread(){
 
 	int i;
 	for(i= 0; i<MAX_THREAD; ++i)
-		if(!threadQueue[i].active)
+		if(!threadQueue[i].status)
 			return &threadQueue[i];
 
 	return NULL;
 }
-
+*/
 
 void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_addr, size_t sk_size){
 
@@ -144,6 +144,7 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 	/* Step 14: 
 	Return to the calling application. */
 	printf("INICIO PASO 14\n");
+
 	return;
 
 }
@@ -219,6 +220,7 @@ void mctx_create_boot(){
 	printf("FIN FUNCIÓN\n");
 
 	printf("************************************************\n");
+	mctx_restore(&mctx_caller);
 
 	/* NOTREACHED */
 	//abort();
@@ -228,16 +230,18 @@ void mctx_create_boot(){
 
 int pmtInitialize(){
 
-	//threadQueue= queueAlloc();
 	numThread= 0;
 	currentThread= -1;
 	threadExecution= false;
+	threadQueue= queueAlloc();
 
+/*
 	int i;
 	for(i= 0; i<MAX_THREAD; ++i){
 
 		//threadQueue[i].ctx= NULL;
    		threadQueue[i].id= 0;
+   		threadQueue[i].status= PMT_INVALID;
    		threadQueue[i].mctx_arg= NULL;
 		threadQueue[i].priority= -1;
 		threadQueue[i].mctx_func= NULL;
@@ -247,20 +251,41 @@ int pmtInitialize(){
 		threadQueue[i].timeout= 0;
 
 	}
-
-	return 0;
+*/
+	return PMT_OK;
 
 }
 
 int pmtTerminate(){
 
-	//queueFree(threadQueue);
+	thread_t *thr;
+	while(!queueEmpty(threadQueue)){
 
+		thr= queueFront(threadQueue);
+		queuePop(threadQueue);
+
+		if(thr->sk_addr)
+			free(thr->sk_addr);
+
+		thr->ctx= NULL;
+		thr->mctx_func= NULL;
+		thr->mctx_arg= NULL;
+		thr->sk_addr= NULL;
+
+		free(thr);
+
+	}
+
+	//Eliminar cada hilo por separado.
+	queueFree(threadQueue);
+
+/*
 	int i;
 	for(i= 0; i<MAX_THREAD; ++i){
 
 		//threadQueue[i].ctx= NULL;
    		threadQueue[i].id= 0;
+   		threadQueue[i].status= PMT_INVALID;
    		threadQueue[i].mctx_arg= NULL;
 		threadQueue[i].priority= -1;
 		threadQueue[i].mctx_func= NULL;
@@ -274,29 +299,59 @@ int pmtTerminate(){
 		threadQueue[i].sk_addr= NULL;
 
 	}
-
-	return 0;
+*/
+	return PMT_OK;
 }
 
-int pmtCreateThread(pmtId *id, void (*func)(void*), void* arg){
+static int pmtDestroyThread(thread_t *thr){
+
+	if(thr == NULL)
+		return PMT_INVALID_THREAD;
+
+	if(thr->sk_addr)
+		free(thr->sk_addr);
+
+	thr->ctx= NULL;
+	thr->mctx_func= NULL;
+	thr->mctx_arg= NULL;
+	thr->sk_addr= NULL;
+
+	free(thr);
+	thr= NULL;
+
+	return PMT_OK;
+
+}
+
+int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 
 	if(numThread == MAX_THREAD)
-		return PMT_MAX_THREAD;
+		return PMT_THREAD_LIMIT_EXCEEDED;
 
-	//thread_t *thr = malloc(sizeof(thread_t));
-	thread_t *thr= getThread();
+	thread_t *thr = malloc(sizeof(thread_t));
+	//thread_t *thr= getThread();
 
 	thr->id= numThread++;
-	thr->active= 1;
+	thr->status= PMT_INVALID;
 	//printf("%d\n", thr->id);
     thr->ctx = malloc(sizeof(mctx_t));
     thr->priority= -1;
     thr->mctx_func= func;
     thr->mctx_arg= arg;
     thr->sk_addr= malloc(sigstksz);
+	thr->block_type= -1;
 	thr->time= 0;
+	thr->timeout= -1;
 
+
+	//DUDA ¿mctx_create(..., thr->sk_addr + sigstksz, sigstksz) ó mctx_create(..., thr->sk_addr, sigstksz)?
+
+	//mctx_create(thr->ctx, thr->mctx_func, thr->mctx_arg, thr->sk_addr + sigstksz, sigstksz);
 	mctx_create(thr->ctx, thr->mctx_func, thr->mctx_arg, thr->sk_addr, sigstksz);
+
+	thr->status= PMT_READY;
+
+	queuePushBack(threadQueue, thr);
 
 	(*id)= thr->id;
 	printf("SALIO\n");
@@ -305,22 +360,53 @@ int pmtCreateThread(pmtId *id, void (*func)(void*), void* arg){
 }
 
 int pmtYield(){
-	return 0;
+
+
+
+	return PMT_OK;
 }
 
-int pmtRunThread(pmtId id){
+int pmtRunThread(){
 
-	if(id < MAX_THREAD && threadQueue[id].active)
-		mctx_switch(&mctx_caller, threadQueue[id].ctx);
+	//if(id >= MAX_THREAD)
+	//	return PMT_THREAD_LIMIT_EXCEEDED;
 
-	return PMT_MAX_THREAD;
+	//if(!threadQueue[id].status)
+	//	return PMT_INVALID_THREAD;
+
+	thread_t *thr;
+	while(!queueEmpty(threadQueue)){
+
+		thr= (thread_t*)queueFront(threadQueue);
+
+		if(thr->status == PMT_READY){
+
+			queuePop(threadQueue);
+			mctx_switch(&mctx_caller, thr->ctx);
+			thr->status= PMT_FINISHED;
+
+		}
+
+		if(thr->status == PMT_READY){
+
+			queuePushBack(threadQueue, thr);
+
+		}else{
+
+			pmtDestroyThread(thr);
+
+		}
+		
+	}
+
+	return PMT_OK;
 
 }
 
-int pmtSetupThread(pmtId id){
-	return 0;
+int pmtSetupThread(pmtID id){
+	return PMT_OK;
 }
 
-int pmtSetupScheduler(pmtId id){
-	return 0;
+int pmtSetupScheduler(pmtID id){
+	return PMT_OK;
 }
