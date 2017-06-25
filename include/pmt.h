@@ -10,10 +10,20 @@ typedef struct mctx_st{
 	jmp_buf jb;
 }mctx_t;
 
-typedef unsigned int pmtId;
+typedef unsigned int pmtID;
 
 #define PMT_OK 0
-#define	PMT_MAX_THREAD 1
+#define	PMT_THREAD_LIMIT_EXCEEDED 1
+#define PMT_INVALID_THREAD 2
+
+typedef enum STATUS{
+
+	PMT_INVALID= 0,
+	PMT_READY,
+	PMT_FINISHED
+
+}PMT_STATUS;
+
 
 #define MAX_THREAD 10
 
@@ -45,10 +55,10 @@ static void mctx_create_boot();
 
 int pmtInitialize();
 int pmtTerminate();
-int pmtCreateThread(pmtId *id, void (*func)(void*), void* arg);
+int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg);
 int pmtYield();
-int pmtRunThread(pmtId id);
-int pmtSetupThread(pmtId id);
-int pmtSetupScheduler(pmtId id);
+int pmtRunThread();
+int pmtSetupThread(pmtID id);
+int pmtSetupScheduler(pmtID id);
 
 #endif
