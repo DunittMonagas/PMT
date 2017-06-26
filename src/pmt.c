@@ -371,11 +371,7 @@ void pmtYield(){
 
 	if(threadExecution){
 
-		if(mctx_save(currentThread->ctx)){
-
-		}else{
-			mctx_restore(&mctx_caller);
-		}
+		mctx_switch(currentThread->ctx, &mctx_caller);
 
 	}else{
 
