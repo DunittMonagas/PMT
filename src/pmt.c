@@ -267,6 +267,9 @@ int pmtTerminate(){
 		if(thr->sk_addr)
 			free(thr->sk_addr);
 
+		if(thr->ctx)
+			free(thr->ctx);
+
 		thr->ctx= NULL;
 		thr->mctx_func= NULL;
 		thr->mctx_arg= NULL;
@@ -310,6 +313,9 @@ static int pmtDestroyThread(thread_t *thr){
 
 	if(thr->sk_addr)
 		free(thr->sk_addr);
+
+	if(thr->ctx)
+		free(thr->ctx);
 
 	thr->ctx= NULL;
 	thr->mctx_func= NULL;
