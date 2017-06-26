@@ -377,6 +377,29 @@ void pmtYield(){
 			mctx_restore(&mctx_caller);
 		}
 
+	}else{
+
+		if(queueEmpty(threadQueue))
+			return;
+
+		if(mctx_save(&mctx_caller)){
+
+			threadExecution= false;
+			if(currentThread->status == PMT_FINISHED){
+				pmtDestroyThread(currentThread);
+			}else{
+				queuePushBack(threadQueue, currentThread);
+			}
+
+		}else{
+
+			currentThread= queueFront(threadQueue);
+			threadExecution= true;
+
+			mctx_restore(currentThread->ctx);
+
+		}
+
 	}
 
 }
