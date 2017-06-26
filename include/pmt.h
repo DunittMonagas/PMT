@@ -56,7 +56,7 @@ static void mctx_create_boot();
 int pmtInitialize();
 int pmtTerminate();
 int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg);
-int pmtYield();
+void pmtYield();
 int pmtRunThread();
 int pmtSetupThread(pmtID id);
 int pmtSetupScheduler(pmtID id);

@@ -29,8 +29,8 @@ typedef struct thread{
 static queue_t *threadQueue;
 static int numThread= 0;
 static int sigstksz = 16384;
-static int currentThread= -1;
 static bool threadExecution= false;
+static thread_t *currentThread= NULL;
 //static thread_t threadQueue[MAX_THREAD];
 
 /*
@@ -219,6 +219,8 @@ void mctx_create_boot(){
 	mctx_start_func(mctx_start_arg);
 	printf("FIN FUNCIÓN\n");
 
+	currentThread->status= PMT_FINISHED;
+
 	printf("************************************************\n");
 	mctx_restore(&mctx_caller);
 
@@ -231,7 +233,7 @@ void mctx_create_boot(){
 int pmtInitialize(){
 
 	numThread= 0;
-	currentThread= -1;
+	currentThread= NULL;
 	threadExecution= false;
 	threadQueue= queueAlloc();
 
@@ -365,11 +367,18 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 	return PMT_OK;
 }
 
-int pmtYield(){
+void pmtYield(){
 
+	if(threadExecution){
 
+		if(mctx_save(currentThread->ctx)){
 
-	return PMT_OK;
+		}else{
+			mctx_restore(&mctx_caller);
+		}
+
+	}
+
 }
 
 int pmtRunThread(){
@@ -380,26 +389,28 @@ int pmtRunThread(){
 	//if(!threadQueue[id].status)
 	//	return PMT_INVALID_THREAD;
 
-	thread_t *thr;
+	//thread_t *thr;
 	while(!queueEmpty(threadQueue)){
 
-		thr= (thread_t*)queueFront(threadQueue);
+		currentThread= (thread_t*)queueFront(threadQueue);
 
-		if(thr->status == PMT_READY){
+		if(currentThread->status == PMT_READY){
 
 			queuePop(threadQueue);
-			mctx_switch(&mctx_caller, thr->ctx);
-			thr->status= PMT_FINISHED;
+			threadExecution= true;
+			mctx_switch(&mctx_caller, currentThread->ctx);
+			threadExecution= false;
+			//currentThread->status= PMT_FINISHED;
 
 		}
 
-		if(thr->status == PMT_READY){
+		if(currentThread->status == PMT_READY){
 
-			queuePushBack(threadQueue, thr);
+			queuePushBack(threadQueue, currentThread);
 
 		}else{
 
-			pmtDestroyThread(thr);
+			pmtDestroyThread(currentThread);
 
 		}
 		
