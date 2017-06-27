@@ -16,6 +16,7 @@ typedef struct queueNode{
 typedef struct queue_t{
 
 	queueNode *head;
+	queueNode *tail;
 	unsigned int size;
 	bool (*comparisonFunction)(void*, void*);
 
@@ -28,6 +29,7 @@ queue_t *queueAlloc(bool (*comp)(void*, void*)){
 
 	q->size= 0;
 	q->head= NULL;
+	q->tail= NULL;
 	q->comparisonFunction= comp;
 
 	return q;
@@ -69,13 +71,35 @@ void queuePop(queue_t *q){
 
 }
 
-void queuePushBack(queue_t *q, void *item){
+static void _queuePushBack(queue_t *q, void *item){
 
 	queueNode *new= (queueNode*) malloc(sizeof(queueNode));
 
 	new->next= NULL;
 	new->item= item;
-	
+
+	if(queueSize(q))
+		q->tail->next= new;
+	else
+		q->head= new;
+
+	q->tail= new;
+	q->size++;
+
+}
+
+void queuePushBack(queue_t *q, void *item){
+
+	if(q->comparisonFunction == NULL){
+		_queuePushBack(q, item);
+		return;
+	}
+
+	queueNode *new= (queueNode*) malloc(sizeof(queueNode));
+
+	new->next= NULL;
+	new->item= item;
+
 	if(q->head == NULL || q->comparisonFunction(q->head->item, new->item)){
 
 		new->next= q->head;
