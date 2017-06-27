@@ -16,19 +16,19 @@ typedef struct queueNode{
 typedef struct queue_t{
 
 	queueNode *head;
-	queueNode *tail;
 	unsigned int size;
+	bool (*comparisonFunction)(void*, void*);
 
 }queue_t;
 
 
-queue_t *queueAlloc(){
+queue_t *queueAlloc(bool (*comp)(void*, void*)){
 
 	queue_t *q= (queue_t*) malloc(sizeof(queue_t));
 
 	q->size= 0;
 	q->head= NULL;
-	q->tail= NULL;
+	q->comparisonFunction= comp;
 
 	return q;
 
@@ -71,17 +71,31 @@ void queuePop(queue_t *q){
 
 void queuePushBack(queue_t *q, void *item){
 
-	queueNode *back= (queueNode*) malloc(sizeof(queueNode));
+	queueNode *new= (queueNode*) malloc(sizeof(queueNode));
 
-	back->next= NULL;
-	back->item= item;
+	new->next= NULL;
+	new->item= item;
+	
+	if(q->head == NULL || q->comparisonFunction(q->head->item, new->item)){
 
-	if(queueSize(q))
-		q->tail->next= back;
-	else
-		q->head= back;
+		new->next= q->head;
+		q->head= new;
 
-	q->tail= back;
+	}else{
+
+		queueNode *it= q->head;
+		while(it->next != NULL && q->comparisonFunction(new->item, it->next->item))
+			it= it->next;
+
+		new->next= it->next;
+		it->next= new;
+
+	}
+
 	q->size++;
 	
+}
+
+void queueSetupComparisonFunction(queue_t *q, bool (*comp)(void*, void*)){
+	q->comparisonFunction= comp;
 }
