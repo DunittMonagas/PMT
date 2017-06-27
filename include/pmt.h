@@ -24,6 +24,15 @@ typedef enum STATUS{
 
 }PMT_STATUS;
 
+typedef enum SCHEDULER{
+
+	PMT_FIFO= 0,
+	PMT_ROUND_ROBIN,
+	PMT_PRIORIY,
+	PMT_PRIORIY_AGING
+
+}PMT_SCHEDULER;
+
 
 #define MAX_THREAD 10
 
@@ -58,7 +67,7 @@ int pmtTerminate();
 int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg);
 void pmtYield();
 int pmtRunThread();
-int pmtSetupThread(pmtID id);
-int pmtSetupScheduler(pmtID id);
+int pmtSetupThread(pmtID id, int priority);
+int pmtSetupScheduler(PMT_SCHEDULER scheduler);
 
 #endif

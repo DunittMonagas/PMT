@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -20,18 +21,18 @@ typedef struct thread{
 	void (*mctx_func)(void*);
 	void *sk_addr;
 	int block_type;
-	int time;
+	time_t lastRun;
 	int timeout;
 
 }thread_t;
 
 
-static queue_t *threadQueue;
 static int numThread= 0;
 static int sigstksz = 16384;
+static queue_t *threadQueue= NULL;
 static bool threadExecution= false;
 static thread_t *currentThread= NULL;
-//static thread_t threadQueue[MAX_THREAD];
+static thread_t *threadPool[MAX_THREAD];
 
 /*
 static thread_t* getThread(){
@@ -44,6 +45,35 @@ static thread_t* getThread(){
 	return NULL;
 }
 */
+
+bool priorities(void *lhs, void *rhs){
+
+	//printf("lhs %d\n", ((thread_t*)lhs)->priority);
+	//printf("rhs %d\n", ((thread_t*)rhs)->priority);
+
+	
+	return ((thread_t*)lhs)->priority < ((thread_t*)rhs)->priority;
+
+}
+
+bool prioritiesAging(void *lhs, void *rhs){
+
+	//printf("lhs %d\n", ((thread_t*)lhs)->priority);
+	//printf("rhs %d\n", ((thread_t*)rhs)->priority);
+
+	double diff= difftime(((thread_t*)lhs)->lastRun, ((thread_t*)rhs)->lastRun);
+
+	printf("%f\n", diff);
+
+	if(diff < 0.0)
+		return false;
+	else
+		return true;
+	//return ((thread_t*)lhs)->priority < ((thread_t*)rhs)->priority;
+
+}
+
+
 
 void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_addr, size_t sk_size){
 
@@ -235,7 +265,11 @@ int pmtInitialize(){
 	numThread= 0;
 	currentThread= NULL;
 	threadExecution= false;
-	threadQueue= queueAlloc();
+	threadQueue= queueAlloc(NULL);
+
+	int i;
+	for(i= 0; i<MAX_THREAD; ++i)
+		threadPool[i]= NULL;
 
 /*
 	int i;
@@ -277,12 +311,18 @@ int pmtTerminate(){
 		thr->mctx_arg= NULL;
 		thr->sk_addr= NULL;
 
+		printf("ID %d, %d\n", thr->id, thr->priority);
+
 		free(thr);
 
 	}
 
 	//Eliminar cada hilo por separado.
 	queueFree(threadQueue);
+
+	int i;
+	for(i= 0; i<MAX_THREAD; ++i)
+		threadPool[i]= NULL;
 
 /*
 	int i;
@@ -324,6 +364,11 @@ static int pmtDestroyThread(thread_t *thr){
 	thr->mctx_arg= NULL;
 	thr->sk_addr= NULL;
 
+	int i;
+	for(i= 0; i<MAX_THREAD; ++i)
+		if(threadPool[i] != NULL && threadPool[i]->id == thr->id)
+			threadPool[i]= NULL;
+
 	free(thr);
 	thr= NULL;
 
@@ -343,20 +388,27 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 	thr->status= PMT_INVALID;
 	//printf("%d\n", thr->id);
     thr->ctx = malloc(sizeof(mctx_t));
-    thr->priority= -1;
+    thr->priority= 1;
     thr->mctx_func= func;
     thr->mctx_arg= arg;
     thr->sk_addr= malloc(sigstksz);
 	thr->block_type= -1;
-	thr->time= 0;
 	thr->timeout= -1;
 
+	int i;
+	for(i= 0; i<MAX_THREAD; ++i)
+		if(threadPool[i] == NULL){
+			printf("LIBRE\n");
+			threadPool[i]= thr;
+			break;
+		}
 
 	//DUDA ¿mctx_create(..., thr->sk_addr + sigstksz, sigstksz) ó mctx_create(..., thr->sk_addr, sigstksz)?
 
 	//mctx_create(thr->ctx, thr->mctx_func, thr->mctx_arg, thr->sk_addr + sigstksz, sigstksz);
 	mctx_create(thr->ctx, thr->mctx_func, thr->mctx_arg, thr->sk_addr, sigstksz);
 
+	time(&(thr->lastRun));
 	thr->status= PMT_READY;
 
 	queuePushBack(threadQueue, thr);
@@ -374,6 +426,7 @@ void pmtYield(){
 		if(mctx_save(currentThread->ctx)){
 
 		}else{
+			//time(&(currentThread->lastRun));
 			mctx_restore(&mctx_caller);
 		}
 
@@ -400,6 +453,7 @@ int pmtRunThread(){
 			threadExecution= true;
 			mctx_switch(&mctx_caller, currentThread->ctx);
 			threadExecution= false;
+			time(&(currentThread->lastRun));
 			//currentThread->status= PMT_FINISHED;
 
 		}
@@ -420,10 +474,33 @@ int pmtRunThread(){
 
 }
 
-int pmtSetupThread(pmtID id){
+int pmtSetupThread(pmtID id, int priority){
+
+	int i;
+	thread_t *thr= NULL;
+
+	for(i= 0; i<MAX_THREAD; ++i)
+		if(threadPool[i] != NULL && threadPool[i]->id == id){
+			printf("ENCONTRADO\n");
+			thr= threadPool[i];
+			break;
+		}
+
+	thr->priority= priority;
+
 	return PMT_OK;
 }
 
-int pmtSetupScheduler(pmtID id){
+int pmtSetupScheduler(PMT_SCHEDULER scheduler){
+
+	if(scheduler == PMT_FIFO)
+		queueSetupComparisonFunction(threadQueue, NULL);
+	else if(scheduler == PMT_ROUND_ROBIN)
+		queueSetupComparisonFunction(threadQueue, NULL);
+	else if(scheduler == PMT_PRIORIY)
+		queueSetupComparisonFunction(threadQueue, priorities);
+	else if(scheduler == PMT_PRIORIY_AGING)
+		queueSetupComparisonFunction(threadQueue, prioritiesAging);
+
 	return PMT_OK;
 }
