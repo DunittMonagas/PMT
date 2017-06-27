@@ -33,6 +33,7 @@ static queue_t *threadQueue= NULL;
 static bool threadExecution= false;
 static thread_t *currentThread= NULL;
 static thread_t *threadPool[MAX_THREAD];
+static bool (*scheduler)(void*, void*)= NULL;
 
 /*
 static thread_t* getThread(){
@@ -487,20 +488,38 @@ int pmtSetupThread(pmtID id, int priority){
 		}
 
 	thr->priority= priority;
+	
+	//INICIO DEL CÓDIGO VERGONZOSO
+	queueFree(threadQueue);
+	threadQueue= queueAlloc(scheduler);
+
+	for(i= 0; i<MAX_THREAD; ++i)
+		if(threadPool[i] != NULL){
+			//printf("ENCONTRADO\n");
+			queuePushBack(threadQueue, threadPool[i]);
+			
+		}
+	//FIN DEL CÓDIGO VERGONZOSO
 
 	return PMT_OK;
 }
 
-int pmtSetupScheduler(PMT_SCHEDULER scheduler){
+int pmtSetupScheduler(PMT_SCHEDULER newScheduler){
 
-	if(scheduler == PMT_FIFO)
-		queueSetupComparisonFunction(threadQueue, NULL);
-	else if(scheduler == PMT_ROUND_ROBIN)
-		queueSetupComparisonFunction(threadQueue, NULL);
-	else if(scheduler == PMT_PRIORIY)
-		queueSetupComparisonFunction(threadQueue, priorities);
-	else if(scheduler == PMT_PRIORIY_AGING)
-		queueSetupComparisonFunction(threadQueue, prioritiesAging);
+	if(newScheduler == PMT_FIFO)
+		scheduler= NULL;
+		//queueSetupComparisonFunction(threadQueue, NULL);
+	else if(newScheduler == PMT_ROUND_ROBIN)
+		scheduler= NULL;
+		//queueSetupComparisonFunction(threadQueue, NULL);
+	else if(newScheduler == PMT_PRIORIY)
+		scheduler= priorities;
+		//queueSetupComparisonFunction(threadQueue, priorities);
+	else if(newScheduler == PMT_PRIORIY_AGING)
+		scheduler= prioritiesAging;
+		//queueSetupComparisonFunction(threadQueue, prioritiesAging);
+
+	queueSetupComparisonFunction(threadQueue, scheduler);
 
 	return PMT_OK;
 }
