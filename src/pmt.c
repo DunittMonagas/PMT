@@ -39,16 +39,13 @@ typedef struct thread{
 
 
 static int numThread= 0;
-static int sigstksz = 16384;
-
-static queue_t *threadQueue= NULL;
-static thread_t *threadPool[MAX_THREAD];
-static bool (*scheduler)(void*, void*)= NULL;
-
 static unsigned quantum= 3;
+static bool roundRobin= false;
+static queue_t *threadQueue= NULL;
 static bool threadExecution= false;
 static thread_t *currentThread= NULL;
-static bool roundRobin= false;
+static thread_t *threadPool[MAX_THREAD];
+static bool (*scheduler)(void*, void*)= NULL;
 
 
 
@@ -355,7 +352,7 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
     thr->priority= 1;
     thr->mctx_func= func;
     thr->mctx_arg= arg;
-    thr->sk_addr= malloc(sigstksz);
+    thr->sk_addr= malloc(STACK_SIZE);
 	thr->block_type= 0;
 
 	int i;
@@ -365,7 +362,7 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 			break;
 		}
 
-	mctx_create(thr->ctx, thr->mctx_func, thr->mctx_arg, thr->sk_addr, sigstksz);
+	mctx_create(thr->ctx, thr->mctx_func, thr->mctx_arg, thr->sk_addr, STACK_SIZE);
 
 	time(&(thr->lastRun));
 	thr->status= PMT_READY;

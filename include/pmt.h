@@ -17,6 +17,7 @@ typedef unsigned int pmtID;
 #define PMT_INVALID_THREAD 2
 
 #define MAX_THREAD 10
+#define STACK_SIZE 16384
 
 
 typedef enum SCHEDULER{
