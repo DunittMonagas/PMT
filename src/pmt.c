@@ -83,7 +83,7 @@ bool prioritiesAging(void *lhs, void *rhs){
 
 	double diff= difftime(((thread_t*)lhs)->lastRun, ((thread_t*)rhs)->lastRun);
 
-	printf("%f\n", diff);
+	//printf("%f\n", diff);
 
 	if(diff < 0.0)
 		return false;
@@ -96,30 +96,30 @@ bool prioritiesAging(void *lhs, void *rhs){
 
 void alarmHandler(int sig){
 
-	printf("INTERRUPCIÓN\n");
+	//printf("INTERRUPCIÓN\n");
 	if(threadExecution){
 
 		currentThread->block_type= 1;
-		printf("A MITAD DEL PROCESO %d\n", currentThread->id);
+		//printf("A MITAD DEL PROCESO %d\n", currentThread->id);
 		//alarm(quantum);
 		//signal(SIGALRM, SIG_IGN);          /* ignore this signal       */
 
-		printf("BLOQUEANDO\n");
+		//printf("BLOQUEANDO\n");
 		sigset_t block;
 		sigemptyset(&block);
 		sigaddset(&block, SIGALRM);
 
 		sigprocmask(SIG_BLOCK, &block, NULL);
 
-		printf("SEÑAL IGNORADA\n");
+		//printf("SEÑAL IGNORADA\n");
 		mctx_switch(currentThread->ctx, &mctx_caller);
 
-		printf("DESBLOQUEANDO\n");
+		//printf("DESBLOQUEANDO\n");
 		sigemptyset(&block);
 		sigaddset(&block, SIGALRM);
-		printf("AQUI\n");
+		//printf("AQUI\n");
 		sigprocmask(SIG_UNBLOCK, &block, NULL);
-		printf("TERMINA INTERRUPCIÓN\n");
+		//printf("TERMINA INTERRUPCIÓN\n");
 
 		currentThread->block_type= 0;
 		//signal(SIGALRM, alarmHandler);
@@ -145,11 +145,11 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 	signal can be used for this – even an already used
 	one). This worker signal is later temporarily 
 	required for the trampoline step. */
-	printf("INICIO PASO 1\n");
+	//printf("INICIO PASO 1\n");
 	sigemptyset(&sigs);
 	sigaddset(&sigs, SIGUSR1);
 	sigprocmask(SIG_BLOCK, &sigs, &osigs);
-	printf("FIN PASO 1\n");
+	//printf("FIN PASO 1\n");
 
 	/* Step 2: 
 	Preserve a possibly existing signal action for the
@@ -157,25 +157,25 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 	as the new temporary signal action. The signal 
 	delivery is configured to occur on an alternate signal
 	stack (see next step). */
-	printf("INICIO PASO 2\n");
+	//printf("INICIO PASO 2\n");
 	memset((void *)&sa, 0, sizeof(struct sigaction));
 	sa.sa_handler = mctx_create_trampoline;
 	sa.sa_flags = SA_ONSTACK;
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGUSR1, &sa, &osa);
-	printf("FIN PASO 2\n");
+	//printf("FIN PASO 2\n");
 
 	/* Step 3: 
 	Preserve a possibly active alternate signal stack
 	and configure the memory chunk starting at
 	sk addr as the new temporary alternate signal
 	stack of length sk size. */
-	printf("INICIO PASO 3\n");
+	//printf("INICIO PASO 3\n");
 	ss.ss_sp = sk_addr;
 	ss.ss_size = sk_size;
 	ss.ss_flags = 0;
 	sigaltstack(&ss, &oss);
-	printf("FIN PASO 3\n");
+	//printf("FIN PASO 3\n");
 
 	/* Step 4: 
 	Save parameters for the trampoline step (mctx,
@@ -184,7 +184,7 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 	it and this way allow it to be delivered on the
 	signal stack in order to transfer execution control
 	to the trampoline function. */
-	printf("INICIO PASO 4\n");
+	//printf("INICIO PASO 4\n");
 	mctx_creat = mctx;
 	mctx_creat_func = sf_addr;
 	mctx_creat_arg = sf_arg;
@@ -195,14 +195,14 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 	sigdelset(&sigs, SIGUSR1);
 	while (!mctx_called)
 		sigsuspend(&sigs);
-	printf("FIN PASO 4\n");
+	//printf("FIN PASO 4\n");
 
 	/* Step 6: 
 	Restore the preserved alternate signal stack, 
 	preserved signal action and preserved signal mask for
 	worker signal. This way an existing application
 	configuration for the worker signal is restored. */
-	printf("INICIO PASO 6\n");
+	//printf("INICIO PASO 6\n");
 	sigaltstack(NULL, &ss);
 	ss.ss_flags = SS_DISABLE;
 	sigaltstack(&ss, NULL);
@@ -210,7 +210,7 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 		sigaltstack(&oss, NULL);
 	sigaction(SIGUSR1, &osa, NULL);
 	sigprocmask(SIG_SETMASK, &osigs, NULL);
-	printf("FIN PASO 6\n");
+	//printf("FIN PASO 6\n");
 
 	/* Step 7: 
 	Save the current machine context of
@@ -222,13 +222,13 @@ void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_a
 	the trampoline function (mctx) to again transfer 
 	execution control onto the alternate stack, but this
 	time without(!) signal handler scope. */
-	printf("INICIO PASO 7 Y 8\n");
+	//printf("INICIO PASO 7 Y 8\n");
 	mctx_switch(&mctx_caller, mctx);
-	printf("FIN PASO 7 Y 8\n");
+	//printf("FIN PASO 7 Y 8\n");
 
 	/* Step 14: 
 	Return to the calling application. */
-	printf("INICIO PASO 14\n");
+	//printf("INICIO PASO 14\n");
 
 	return;
 
@@ -241,20 +241,20 @@ void mctx_create_trampoline(int sig){
 	save its machine context in the mctx structure 
 	and immediately return from it to terminate
 	the signal handler scope. */
-	printf("INICIO PASO 5\n");
+	//printf("INICIO PASO 5\n");
 	if (mctx_save(mctx_creat) == 0){
 		mctx_called = true;
 		return;
 	}
-	printf("FIN PASO 5\n");
+	//printf("FIN PASO 5\n");
 
 	/* Step 9: 
 	After reaching the trampoline function (mctx)
 	again, immediately bootstrap into a clean stack
 	frame by just calling a second function. */
-	printf("INICIO PASO 9\n");
+	//printf("INICIO PASO 9\n");
 	mctx_create_boot();
-	printf("FIN PASO 9\n");
+	//printf("FIN PASO 9\n");
 
 }
 
@@ -269,9 +269,9 @@ void mctx_create_boot(){
 	mctx create was called. This is required because 
 	in the first trampoline step we usually had at
 	least the worker signal blocked. */
-	printf("INICIO PASO 10\n");
+	//printf("INICIO PASO 10\n");
 	sigprocmask(SIG_SETMASK, &mctx_creat_sigs, NULL);
-	printf("FIN PASO 10\n");
+	//printf("FIN PASO 10\n");
 
 	/* Step 11: 
 	Load the passed startup information (sf addr,
@@ -280,10 +280,10 @@ void mctx_create_boot(){
 	values have to be preserved in machine context 
 	dependent memory until the created machine context
 	is the first time restored by the application. */
-	printf("INICIO PASO 11\n");
+	//printf("INICIO PASO 11\n");
 	mctx_start_func = mctx_creat_func;
 	mctx_start_arg = mctx_creat_arg;
-	printf("FIN PASO 11\n");
+	//printf("FIN PASO 11\n");
 
 	/* Step 12:
 	Save the current machine context for later 
@@ -293,11 +293,11 @@ void mctx_create_boot(){
 	Restore the previously saved machine context of
 	mctx create to transfer execution control back
 	to it. */
-	printf("INICIO PASO 12\n");
-	printf("INICIO PASO 13\n");
+	//printf("INICIO PASO 12\n");
+	//printf("INICIO PASO 13\n");
 	mctx_switch(mctx_creat, &mctx_caller);
-	printf("FIN PASO 12\n");
-	printf("FIN PASO 13\n");
+	//printf("FIN PASO 12\n");
+	//printf("FIN PASO 13\n");
 /*
 	if(roundRobin){
 		printf("CONFIGURANDO ALARMA %d\n", quantum);
@@ -320,13 +320,13 @@ void mctx_create_boot(){
 	}
 
 	/* The thread ‘‘magically’’ starts... */
-	printf("INICIO FUNCIÓN\n");
+	//printf("INICIO FUNCIÓN\n");
 	mctx_start_func(mctx_start_arg);
-	printf("FIN FUNCIÓN\n");
+	//printf("FIN FUNCIÓN\n");
 
 	currentThread->status= PMT_FINISHED;
 
-	printf("************************************************\n");
+	//printf("************************************************\n");
 	mctx_restore(&mctx_caller);
 
 	/* NOTREACHED */
@@ -391,7 +391,7 @@ int pmtTerminate(){
 		thr->mctx_arg= NULL;
 		thr->sk_addr= NULL;
 
-		printf("ID %d, %d\n", thr->id, thr->priority);
+		//printf("ID %d, %d\n", thr->id, thr->priority);
 
 		free(thr);
 
@@ -478,7 +478,7 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 	int i;
 	for(i= 0; i<MAX_THREAD; ++i)
 		if(threadPool[i] == NULL){
-			printf("LIBRE\n");
+			//printf("LIBRE\n");
 			threadPool[i]= thr;
 			break;
 		}
@@ -494,7 +494,7 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 	queuePushBack(threadQueue, thr);
 
 	(*id)= thr->id;
-	printf("SALIO\n");
+	//printf("SALIO\n");
 
 	return PMT_OK;
 
@@ -519,7 +519,7 @@ void pmtYield(){
 			//printf("AQUI\n");
 			sigprocmask(SIG_UNBLOCK, &block, NULL);
 
-			printf("REGRESANDO YIELD %d\n", currentThread->id);
+			//printf("REGRESANDO YIELD %d\n", currentThread->id);
 			currentThread->block_type= 0;
 
 			if(roundRobin){
@@ -534,7 +534,7 @@ void pmtYield(){
 
 			sigprocmask(SIG_BLOCK, &block, NULL);
 
-			printf("YIELD %d\n", currentThread->id);
+			//printf("YIELD %d\n", currentThread->id);
 
 			mctx_restore(&mctx_caller);
 
@@ -555,7 +555,7 @@ int pmtRunThread(){
 	//thread_t *thr;
 	while(!queueEmpty(threadQueue)){
 
-		printf("ENTRANDO AL PLANIFICADOR\n");
+		//printf("ENTRANDO AL PLANIFICADOR\n");
 		currentThread= (thread_t*)queueFront(threadQueue);
 
 		if(currentThread->status == PMT_READY){
@@ -564,14 +564,14 @@ int pmtRunThread(){
 			threadExecution= true;
 
 			if(roundRobin && currentThread->block_type == 0){
-				printf("ACTIVANDO ALARMA %d\n", quantum);
+				//printf("ACTIVANDO ALARMA %d\n", quantum);
 				//signal(SIGALRM, alarmHandler);
 				alarm(quantum);
 			}
 
-			printf("EJECUTANDO %d\n", currentThread->id);
+			//printf("EJECUTANDO %d\n", currentThread->id);
 			mctx_switch(&mctx_caller, currentThread->ctx);
-			printf("REGRESANDO AL PLANIFICADOR\n");
+			//printf("REGRESANDO AL PLANIFICADOR\n");
 			threadExecution= false;
 
 			time(&(currentThread->lastRun));
@@ -607,7 +607,7 @@ int pmtSetupThread(pmtID id, int priority){
 
 	for(i= 0; i<MAX_THREAD; ++i)
 		if(threadPool[i] != NULL && threadPool[i]->id == id){
-			printf("ENCONTRADO\n");
+			//printf("ENCONTRADO\n");
 			thr= threadPool[i];
 			break;
 		}
