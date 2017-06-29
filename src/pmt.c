@@ -11,6 +11,17 @@
 #include <pmt.h>
 #include <queue.h>
 
+
+
+typedef enum STATUS{
+
+	PMT_INVALID= 0,
+	PMT_READY,
+	PMT_FINISHED
+
+}PMT_STATUS;
+
+
 typedef struct thread{
 
    	pmtID id;
@@ -19,21 +30,28 @@ typedef struct thread{
    	void *mctx_arg;
 	int priority;
 	void (*mctx_func)(void*);
+	sigset_t mctx_sigs;
 	void *sk_addr;
 	int block_type;
 	time_t lastRun;
-	int timeout;
 
 }thread_t;
 
 
+
 static int numThread= 0;
 static int sigstksz = 16384;
+
 static queue_t *threadQueue= NULL;
-static bool threadExecution= false;
-static thread_t *currentThread= NULL;
 static thread_t *threadPool[MAX_THREAD];
 static bool (*scheduler)(void*, void*)= NULL;
+
+static unsigned quantum= 3;
+static bool threadExecution= false;
+static thread_t *currentThread= NULL;
+static bool roundRobin= false;
+
+
 
 /*
 static thread_t* getThread(){
@@ -46,6 +64,7 @@ static thread_t* getThread(){
 	return NULL;
 }
 */
+
 
 bool priorities(void *lhs, void *rhs){
 
@@ -74,6 +93,41 @@ bool prioritiesAging(void *lhs, void *rhs){
 
 }
 
+
+void alarmHandler(int sig){
+
+	printf("INTERRUPCIÓN\n");
+	if(threadExecution){
+
+		currentThread->block_type= 1;
+		printf("A MITAD DEL PROCESO %d\n", currentThread->id);
+		//alarm(quantum);
+		//signal(SIGALRM, SIG_IGN);          /* ignore this signal       */
+
+		printf("BLOQUEANDO\n");
+		sigset_t block;
+		sigemptyset(&block);
+		sigaddset(&block, SIGALRM);
+
+		sigprocmask(SIG_BLOCK, &block, NULL);
+
+		printf("SEÑAL IGNORADA\n");
+		mctx_switch(currentThread->ctx, &mctx_caller);
+
+		printf("DESBLOQUEANDO\n");
+		sigemptyset(&block);
+		sigaddset(&block, SIGALRM);
+		printf("AQUI\n");
+		sigprocmask(SIG_UNBLOCK, &block, NULL);
+		printf("TERMINA INTERRUPCIÓN\n");
+
+		currentThread->block_type= 0;
+		//signal(SIGALRM, alarmHandler);
+		alarm(quantum);
+
+	}
+
+}
 
 
 void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_addr, size_t sk_size){
@@ -244,6 +298,26 @@ void mctx_create_boot(){
 	mctx_switch(mctx_creat, &mctx_caller);
 	printf("FIN PASO 12\n");
 	printf("FIN PASO 13\n");
+/*
+	if(roundRobin){
+		printf("CONFIGURANDO ALARMA %d\n", quantum);
+		alarm(0);
+		signal(SIGALRM, alarmHandler);
+		alarm(quantum);
+	}
+*/
+
+	if(roundRobin){
+
+		//sigprocmask(SIG_SETMASK, NULL, &(currentThread->mctx_sigs));
+
+		sigset_t unlock;
+		sigemptyset(&unlock);
+		sigaddset(&unlock, SIGALRM);
+
+		sigprocmask(SIG_UNBLOCK, &unlock, NULL);	
+
+	}
 
 	/* The thread ‘‘magically’’ starts... */
 	printf("INICIO FUNCIÓN\n");
@@ -263,8 +337,12 @@ void mctx_create_boot(){
 
 int pmtInitialize(){
 
+
 	numThread= 0;
+	scheduler= NULL;
+	roundRobin= false;
 	currentThread= NULL;
+	unsigned quantum= 3;
 	threadExecution= false;
 	threadQueue= queueAlloc(NULL);
 
@@ -290,6 +368,7 @@ int pmtInitialize(){
 	}
 */
 	return PMT_OK;
+
 
 }
 
@@ -393,8 +472,8 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
     thr->mctx_func= func;
     thr->mctx_arg= arg;
     thr->sk_addr= malloc(sigstksz);
-	thr->block_type= -1;
-	thr->timeout= -1;
+	thr->block_type= 0;
+
 
 	int i;
 	for(i= 0; i<MAX_THREAD; ++i)
@@ -418,17 +497,47 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 	printf("SALIO\n");
 
 	return PMT_OK;
+
 }
+
 
 void pmtYield(){
 
+	if(roundRobin){
+		alarm(0);
+	}
+
 	if(threadExecution){
+
+		currentThread->block_type= 1;
 
 		if(mctx_save(currentThread->ctx)){
 
+			sigset_t block;
+			sigemptyset(&block);
+			sigaddset(&block, SIGALRM);
+			//printf("AQUI\n");
+			sigprocmask(SIG_UNBLOCK, &block, NULL);
+
+			printf("REGRESANDO YIELD %d\n", currentThread->id);
+			currentThread->block_type= 0;
+
+			if(roundRobin){
+				alarm(quantum);
+			}
+			
 		}else{
-			//time(&(currentThread->lastRun));
+
+			sigset_t block;
+			sigemptyset(&block);
+			sigaddset(&block, SIGALRM);
+
+			sigprocmask(SIG_BLOCK, &block, NULL);
+
+			printf("YIELD %d\n", currentThread->id);
+
 			mctx_restore(&mctx_caller);
+
 		}
 
 	}
@@ -446,15 +555,31 @@ int pmtRunThread(){
 	//thread_t *thr;
 	while(!queueEmpty(threadQueue)){
 
+		printf("ENTRANDO AL PLANIFICADOR\n");
 		currentThread= (thread_t*)queueFront(threadQueue);
 
 		if(currentThread->status == PMT_READY){
 
 			queuePop(threadQueue);
 			threadExecution= true;
+
+			if(roundRobin && currentThread->block_type == 0){
+				printf("ACTIVANDO ALARMA %d\n", quantum);
+				//signal(SIGALRM, alarmHandler);
+				alarm(quantum);
+			}
+
+			printf("EJECUTANDO %d\n", currentThread->id);
 			mctx_switch(&mctx_caller, currentThread->ctx);
+			printf("REGRESANDO AL PLANIFICADOR\n");
 			threadExecution= false;
+
 			time(&(currentThread->lastRun));
+
+
+			if(roundRobin){
+				alarm(0);
+			}
 			//currentThread->status= PMT_FINISHED;
 
 		}
@@ -504,22 +629,33 @@ int pmtSetupThread(pmtID id, int priority){
 	return PMT_OK;
 }
 
-int pmtSetupScheduler(PMT_SCHEDULER newScheduler){
 
-	if(newScheduler == PMT_FIFO)
-		scheduler= NULL;
-		//queueSetupComparisonFunction(threadQueue, NULL);
-	else if(newScheduler == PMT_ROUND_ROBIN)
-		scheduler= NULL;
-		//queueSetupComparisonFunction(threadQueue, NULL);
-	else if(newScheduler == PMT_PRIORIY)
-		scheduler= priorities;
-		//queueSetupComparisonFunction(threadQueue, priorities);
-	else if(newScheduler == PMT_PRIORIY_AGING)
-		scheduler= prioritiesAging;
-		//queueSetupComparisonFunction(threadQueue, prioritiesAging);
+int pmtSetupScheduler(PMT_OPTION option, int parameter){
 
-	queueSetupComparisonFunction(threadQueue, scheduler);
+	if(option == PMT_SETUP_QUANTUM){
+
+		roundRobin= true;
+		quantum= (unsigned)parameter;
+		signal(SIGALRM, alarmHandler);
+
+	}else if(option == PMT_SETUP_SCHEDULER){
+
+		if(parameter == PMT_FIFO)
+			scheduler= NULL;
+			//queueSetupComparisonFunction(threadQueue, NULL);
+		else if(parameter == PMT_ROUND_ROBIN)
+			scheduler= NULL;
+			//queueSetupComparisonFunction(threadQueue, NULL);
+		else if(parameter == PMT_PRIORIY)
+			scheduler= priorities;
+			//queueSetupComparisonFunction(threadQueue, priorities);
+		else if(parameter == PMT_PRIORIY_AGING)
+			scheduler= prioritiesAging;
+			//queueSetupComparisonFunction(threadQueue, prioritiesAging);
+
+		queueSetupComparisonFunction(threadQueue, scheduler);
+
+	}
 
 	return PMT_OK;
 }

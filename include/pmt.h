@@ -16,13 +16,8 @@ typedef unsigned int pmtID;
 #define	PMT_THREAD_LIMIT_EXCEEDED 1
 #define PMT_INVALID_THREAD 2
 
-typedef enum STATUS{
+#define MAX_THREAD 10
 
-	PMT_INVALID= 0,
-	PMT_READY,
-	PMT_FINISHED
-
-}PMT_STATUS;
 
 typedef enum SCHEDULER{
 
@@ -34,7 +29,13 @@ typedef enum SCHEDULER{
 }PMT_SCHEDULER;
 
 
-#define MAX_THREAD 10
+typedef enum PMT_OPTION{
+
+	PMT_SETUP_SCHEDULER,
+	PMT_SETUP_QUANTUM
+
+}PMT_OPTION;
+
 
 /* save machine context */
 #define mctx_save(mctx) \
@@ -68,6 +69,6 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg);
 void pmtYield();
 int pmtRunThread();
 int pmtSetupThread(pmtID id, int priority);
-int pmtSetupScheduler(PMT_SCHEDULER scheduler);
+int pmtSetupScheduler(PMT_OPTION option, int parameter);
 
 #endif
