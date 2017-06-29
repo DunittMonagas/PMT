@@ -18,6 +18,7 @@ typedef struct thread{
    	void *mctx_arg;
 	int priority;
 	void (*mctx_func)(void*);
+	sigset_t mctx_sigs;
 	void *sk_addr;
 	int block_type;
 	int time;
@@ -29,8 +30,10 @@ typedef struct thread{
 static queue_t *threadQueue;
 static int numThread= 0;
 static int sigstksz = 16384;
+static unsigned quantum= 3;
 static bool threadExecution= false;
 static thread_t *currentThread= NULL;
+static bool roundRobin= false;
 //static thread_t threadQueue[MAX_THREAD];
 
 /*
@@ -44,6 +47,41 @@ static thread_t* getThread(){
 	return NULL;
 }
 */
+
+void alarmHandler(int sig){
+
+	printf("INTERRUPCIÓN\n");
+	if(threadExecution){
+
+		currentThread->block_type= 1;
+		printf("A MITAD DEL PROCESO %d\n", currentThread->id);
+		//alarm(quantum);
+		//signal(SIGALRM, SIG_IGN);          /* ignore this signal       */
+
+		printf("BLOQUEANDO\n");
+		sigset_t block;
+		sigemptyset(&block);
+		sigaddset(&block, SIGALRM);
+
+		sigprocmask(SIG_BLOCK, &block, NULL);
+
+		printf("SEÑAL IGNORADA\n");
+		mctx_switch(currentThread->ctx, &mctx_caller);
+
+		printf("DESBLOQUEANDO\n");
+		sigemptyset(&block);
+		sigaddset(&block, SIGALRM);
+		printf("AQUI\n");
+		sigprocmask(SIG_UNBLOCK, &block, NULL);
+		printf("TERMINA INTERRUPCIÓN\n");
+
+		currentThread->block_type= 0;
+		//signal(SIGALRM, alarmHandler);
+		alarm(quantum);
+
+	}
+
+}
 
 void mctx_create(mctx_t *mctx, void (*sf_addr)(void *), void *sf_arg, void *sk_addr, size_t sk_size){
 
@@ -213,6 +251,26 @@ void mctx_create_boot(){
 	mctx_switch(mctx_creat, &mctx_caller);
 	printf("FIN PASO 12\n");
 	printf("FIN PASO 13\n");
+/*
+	if(roundRobin){
+		printf("CONFIGURANDO ALARMA %d\n", quantum);
+		alarm(0);
+		signal(SIGALRM, alarmHandler);
+		alarm(quantum);
+	}
+*/
+
+	if(roundRobin){
+
+		//sigprocmask(SIG_SETMASK, NULL, &(currentThread->mctx_sigs));
+
+		sigset_t unlock;
+		sigemptyset(&unlock);
+		sigaddset(&unlock, SIGALRM);
+
+		sigprocmask(SIG_UNBLOCK, &unlock, NULL);	
+
+	}
 
 	/* The thread ‘‘magically’’ starts... */
 	printf("INICIO FUNCIÓN\n");
@@ -347,7 +405,7 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
     thr->mctx_func= func;
     thr->mctx_arg= arg;
     thr->sk_addr= malloc(sigstksz);
-	thr->block_type= -1;
+	thr->block_type= 0;
 	thr->time= 0;
 	thr->timeout= -1;
 
@@ -369,12 +427,37 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg){
 
 void pmtYield(){
 
+	if(roundRobin){
+		alarm(0);
+	}
+
 	if(threadExecution){
+
+		currentThread->block_type= 1;
 
 		if(mctx_save(currentThread->ctx)){
 
+			sigset_t block;
+			sigemptyset(&block);
+			sigaddset(&block, SIGALRM);
+			//printf("AQUI\n");
+			sigprocmask(SIG_UNBLOCK, &block, NULL);
+
+			printf("REGRESANDO YIELD %d\n", currentThread->id);
+			currentThread->block_type= 0;
+			alarm(quantum);
+			
 		}else{
+
+			sigset_t block;
+			sigemptyset(&block);
+			sigaddset(&block, SIGALRM);
+
+			sigprocmask(SIG_BLOCK, &block, NULL);
+
+			printf("YIELD %d\n", currentThread->id);
 			mctx_restore(&mctx_caller);
+
 		}
 
 	}
@@ -392,14 +475,28 @@ int pmtRunThread(){
 	//thread_t *thr;
 	while(!queueEmpty(threadQueue)){
 
+		printf("ENTRANDO AL PLANIFICADOR\n");
 		currentThread= (thread_t*)queueFront(threadQueue);
 
 		if(currentThread->status == PMT_READY){
 
 			queuePop(threadQueue);
 			threadExecution= true;
+
+			if(roundRobin && currentThread->block_type == 0){
+				printf("ACTIVANDO ALARMA %d\n", quantum);
+				//signal(SIGALRM, alarmHandler);
+				alarm(quantum);
+			}
+
+			printf("EJECUTANDO %d\n", currentThread->id);
 			mctx_switch(&mctx_caller, currentThread->ctx);
+			printf("REGRESANDO AL PLANIFICADOR\n");
 			threadExecution= false;
+
+			if(roundRobin){
+				alarm(0);
+			}
 			//currentThread->status= PMT_FINISHED;
 
 		}
@@ -424,6 +521,15 @@ int pmtSetupThread(pmtID id){
 	return PMT_OK;
 }
 
-int pmtSetupScheduler(pmtID id){
+int pmtSetupScheduler(PMT_OPTION option, int parameter){
+
+	if(option == PMT_SETUP_QUANTUM){
+
+		roundRobin= true;
+		quantum= (unsigned)parameter;
+		signal(SIGALRM, alarmHandler);
+
+	}
+
 	return PMT_OK;
 }

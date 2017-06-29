@@ -24,6 +24,12 @@ typedef enum STATUS{
 
 }PMT_STATUS;
 
+typedef enum PMT_OPTION{
+
+	PMT_SETUP_SCHEDULER,
+	PMT_SETUP_QUANTUM
+
+}PMT_OPTION;
 
 #define MAX_THREAD 10
 
@@ -59,6 +65,6 @@ int pmtCreateThread(pmtID *id, void (*func)(void*), void* arg);
 void pmtYield();
 int pmtRunThread();
 int pmtSetupThread(pmtID id);
-int pmtSetupScheduler(pmtID id);
+int pmtSetupScheduler(PMT_OPTION option, int parameter);
 
 #endif
