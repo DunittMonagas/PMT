@@ -22,7 +22,7 @@ typedef struct queue_t{
 
 }queue_t;
 
-
+//Constructor
 queue_t *queueAlloc(bool (*comp)(void*, void*)){
 
 	queue_t *q= (queue_t*) malloc(sizeof(queue_t));
@@ -36,6 +36,7 @@ queue_t *queueAlloc(bool (*comp)(void*, void*)){
 
 }
 
+//Destructor
 void queueFree(queue_t *q){
 
 	while(queueSize(q))
@@ -71,6 +72,7 @@ void queuePop(queue_t *q){
 
 }
 
+//Si comparisonFunction == NULL, entonces la cola será FIFO.
 static void _queuePushBack(queue_t *q, void *item){
 
 	queueNode *new= (queueNode*) malloc(sizeof(queueNode));
@@ -120,6 +122,7 @@ void queuePushBack(queue_t *q, void *item){
 	
 }
 
+//Establece la función de comparación.
 void queueSetupComparisonFunction(queue_t *q, bool (*comp)(void*, void*)){
 	q->comparisonFunction= comp;
 }
