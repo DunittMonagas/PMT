@@ -16,14 +16,22 @@ OBJ= $(patsubst %, $(ODIR)/%, $(_OBJ))
 $(ODIR)/%.o: $(SDIR)/%.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-example: $(OBJ) $(ODIR)/example.o
+all: example1 example2 example3 example4
+
+example1: $(OBJ) $(ODIR)/example1.o
 	$(CC) -o $@.out $^ $(CFLAGS)
 
-example5: $(OBJ) $(ODIR)/example5.o
+example2: $(OBJ) $(ODIR)/example2.o
+	$(CC) -o $@.out $^ $(CFLAGS)
+
+example3: $(OBJ) $(ODIR)/example3.o
+	$(CC) -o $@.out $^ $(CFLAGS)
+
+example4: $(OBJ) $(ODIR)/example4.o
 	$(CC) -o $@.out $^ $(CFLAGS)
 
 .PHONY: clean
 
 clean:
-	rm -f $(ODIR)/*.o *~ core $(IDIR)/*~
+	rm -f *.out $(ODIR)/*.o *~ core $(IDIR)/*~
 
